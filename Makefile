@@ -1,6 +1,9 @@
 # configuração para o make, para a compilação do simulador e do montador
 # se alterar este arquivo, cuidado para manter os caracteres "tab" no início das linhas de continuação
 
+# a gambiarra pra montar os .asm em endereços diferentes tá em bash
+SHELL = /bin/bash
+
 # opções de compilação
 CC = gcc
 CFLAGS = -Wall -Werror -g
@@ -8,10 +11,13 @@ LDLIBS = -lcurses
 
 # arquivos objeto compilados (.o) que compõem o simulador (main) e o montador
 OBJS_MAIN = cpu.o es.o memoria.o relogio.o console.o terminal.o tela_curses.o \
-		instrucao.o err.o programa.o controle.o main.o
+		instrucao.o err.o programa.o controle.o main.o \
+		so.o irq.o
 OBJS_MONTADOR = instrucao.o err.o montador.o
 OBJS = ${OBJS_MAIN} ${OBJS_MONTADOR}
-MAQS = ex1.maq ex2.maq ex3.maq ex4.maq ex5.maq ex6.maq
+# arquivos .maq a gerar, com seus endereços
+MAQS = bios.maq trata_int.maq init.maq ex1.maq ex2.maq ex3.maq ex4.maq ex5.maq ex6.maq p1.maq p2.maq p3.maq
+ENDS = 0        60            100      1000    2000    3000    4000    5000    6000    7000   8000   9000
 TARGETS = main montador ${MAQS}
 
 # arquivos que devem ser feitos, se não for especificado no comando do make
@@ -24,9 +30,22 @@ montador: ${OBJS_MONTADOR}
 main: ${OBJS_MAIN}
 
 # para transformar um .asm em .maq, precisamos do montador
-# monta os programas de usuário no endereço 0 (default)
+# monta os programas de usuário nos endereços equivalentes em ENDS
+# se alguém souber de uma forma menos escrota de casar o endereço com
+# o nome, por favor fala
 %.maq: %.asm montador
-	./montador $*.asm > $*.maq
+	@m=(${MAQS}); \
+	e=(${ENDS}); \
+	end=$$( \
+		for i in $$(seq 0 $${#m[@]}); do \
+			if [ $${m[$$i]} = "$@" ]; then \
+				echo $${e[$$i]}; \
+				break; \
+			fi; \
+		done \
+	); \
+	(echo ./montador -e $$end `basename $@ .maq`.asm >&2) && \
+	./montador -e $$end `basename $@ .maq`.asm > $@
 
 # apaga os arquivos gerados
 clean:
